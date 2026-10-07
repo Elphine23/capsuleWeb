@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Open a random time capsule from history or the future.">
+  <title>Capsule — A Time Machine in Your Browser</title>
+  <style>
+    :root {
+      --ink: #f5f1e8;
+      --muted: #9a9a91;
+      --paper: #10100f;
+      --panel: #171714;
+      --line: rgba(245, 241, 232, 0.16);
+      --acid: #d8ff63;
+      --coral: #ff6b4a;
+      --blue: #75b7ff;
+      --serif: Georgia, "Times New Roman", serif;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 77% 31%, rgba(216, 255, 99, 0.07), transparent 24%),
+        radial-gradient(circle at 16% 82%, rgba(117, 183, 255, 0.06), transparent 28%),
+        var(--paper);
+      font-family: var(--sans);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 20;
+      opacity: 0.22;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+      mix-blend-mode: soft-light;
+    }
+
+    button, a { font: inherit; }
+
+    .shell {
+      width: min(1380px, calc(100% - 48px));
+      margin: 0 auto;
+    }
+
+    .topbar {
+      height: 92px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 0.77rem;
+    }
+
+    .brand-mark {
+      position: relative;
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--ink);
+      border-radius: 50%;
+    }
+
+    .brand-mark::before,
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      border: 1px solid var(--ink);
+      border-radius: 50%;
+    }
+
+    .brand-mark::after { inset: 11px; background: var(--acid); border: 0; }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.73rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--acid);
+      box-shadow: 0 0 0 5px rgba(216, 255, 99, 0.09);
+      animation: pulse 2.6s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      50% { opacity: 0.45; transform: scale(0.8); }
+    }
+
+    .hero {
+      min-height: calc(100vh - 92px);
+      display: grid;
+      grid-template-columns: minmax(300px, 0.77fr) minmax(520px, 1.23fr);
+      gap: clamp(46px, 7vw, 110px);
+      align-items: center;
+      padding: 68px 0 78px;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 26px;
+      color: var(--acid);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 30px;
+      height: 1px;
+      background: currentColor;
+    }
+
+    h1 {
+      max-width: 650px;
+      margin: 0;
+      font-family: var(--serif);
+      font-size: clamp(4.2rem, 7.2vw, 7.8rem);
+      font-weight: 400;
+      line-height: 0.83;
+      letter-spacing: -0.07em;
+    }
+
+    h1 em {
+      display: block;
+      color: var(--acid);
+      font-weight: 400;
+    }
+
+    .intro {
+      max-width: 500px;
+      margin: 32px 0 38px;
+      color: #b9b9b0;
+      font-family: var(--serif);
+      font-size: 1.08rem;
+      line-height: 1.65;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      flex-wrap: wrap;
+    }
+
+    .open-button {
+      position: relative;
+      min-width: 210px;
+      border: 0;
+      border-radius: 2px;
+      padding: 17px 22px;
+      color: #11120f;
+      background: var(--acid);
+      font-size: 0.73rem;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      cursor: pointer;
+      overflow: hidden;
+      transition: transform 180ms ease, box-shadow 180ms ease;
+    }
+
+    .open-button::after {
+      content: "↗";
+      margin-left: 22px;
+      font-size: 1rem;
+    }
+
+    .open-button:hover { transform: translateY(-3px); box-shadow: 0 14px 35px rgba(216, 255, 99, 0.18); }
+    .open-button:active { transform: translateY(0); }
+    .open-button:focus-visible, .sound-button:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; }
+
+    .hint {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--muted);
+      font-size: 0.68rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .hint svg { width: 18px; height: 18px; }
+
+    .stage {
+      position: relative;
+      min-height: 660px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .orbit {
+      position: absolute;
+      width: min(680px, 90%);
+      aspect-ratio: 1;
+      border: 1px solid rgba(245, 241, 232, 0.09);
+      border-radius: 50%;
+      animation: rotate 60s linear infinite;
+    }
+
+    .orbit::before,
+    .orbit::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(245, 241, 232, 0.08);
+    }
+
+    .orbit::before { inset: 11%; }
+    .orbit::after { inset: 27%; }
+
+    @keyframes rotate { to { transform: rotate(360deg); } }
+
+    .capsule-card {
+      position: relative;
+      z-index: 2;
+      width: min(100%, 560px);
+      min-height: 610px;
+      border: 1px solid var(--line);
+      background: linear-gradient(145deg, rgba(28, 28, 25, 0.96), rgba(14, 14, 13, 0.96));
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+      transition: transform 520ms cubic-bezier(.2,.8,.2,1), opacity 250ms ease;
+    }
+
+    .capsule-card.revealed { transform: translateY(-5px); }
+
+    .card-top {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 22px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.64rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .card-top strong { color: var(--ink); font-weight: 600; }
+
+    .artifact-visual {
+      position: relative;
+      height: 315px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background:
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px),
+        radial-gradient(circle at 50% 48%, var(--artifact-glow, rgba(216,255,99,.12)), transparent 49%),
+        #11110f;
+      background-size: 34px 34px, 34px 34px, auto, auto;
+      isolation: isolate;
+    }
+
+    .artifact-visual::before {
+      content: "";
+      position: absolute;
+      width: 245px;
+      height: 245px;
+      border: 1px solid rgba(245,241,232,.13);
+      border-radius: 50%;
+      box-shadow: 0 0 0 26px rgba(245,241,232,.015), 0 0 0 52px rgba(245,241,232,.012);
+    }
+
+    .artifact-symbol {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 160px;
+      height: 160px;
+      color: var(--artifact-color, var(--acid));
+      filter: drop-shadow(0 0 18px color-mix(in srgb, var(--artifact-color, var(--acid)) 25%, transparent));
+      transition: transform 700ms cubic-bezier(.2,.8,.2,1), opacity 200ms ease;
+    }
+
+    .capsule-card.revealed .artifact-symbol { animation: land 780ms cubic-bezier(.2,.8,.2,1); }
+
+    @keyframes land {
+      from { opacity: 0; transform: translateY(30px) rotate(-14deg) scale(.76); }
+      to { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+    }
+
+    .artifact-symbol svg { width: 100%; height: 100%; overflow: visible; }
+
+    .card-body { padding: 28px 30px 30px; }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      color: var(--muted);
+      font-size: 0.65rem;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .meta-row span:last-child { color: var(--artifact-color, var(--acid)); }
+
+    .artifact-title {
+      margin: 15px 0 10px;
+      font-family: var(--serif);
+      font-size: clamp(2rem, 4vw, 3.1rem);
+      font-weight: 400;
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    .artifact-caption {
+      min-height: 50px;
+      margin: 0;
+      color: #aaa9a0;
+      font-family: var(--serif);
+      font-size: 0.97rem;
+      line-height: 1.55;
+    }
+
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 27px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .card-footer span:last-child { color: var(--ink); }
+
+    .index-mark {
+      position: absolute;
+      right: -17px;
+      bottom: 80px;
+      color: rgba(245,241,232,.08);
+      font-family: var(--serif);
+      font-size: 170px;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    .footer-note {
+      display: flex;
+      justify-content: space-between;
+      gap: 30px;
+      padding: 0 0 32px;
+      color: #6f6f69;
+      font-size: 0.64rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 980px) {
+      .hero { grid-template-columns: 1fr; padding-top: 70px; }
+      .copy { text-align: center; }
+      .eyebrow, .actions { justify-content: center; }
+      .intro { margin-inline: auto; }
+      .stage { min-height: 620px; }
+      .capsule-card { width: min(100%, 590px); }
+    }
+
+    @media (max-width: 600px) {
+      .shell { width: min(100% - 26px, 1380px); }
+      .topbar { height: 74px; }
+      .status span:last-child { display: none; }
+      .hero { gap: 30px; padding: 50px 0 54px; }
+      h1 { font-size: clamp(3.65rem, 19vw, 5.5rem); }
+      .intro { font-size: 1rem; }
+      .actions { flex-direction: column; }
+      .open-button { width: 100%; }
+      .stage { min-height: 570px; }
+      .capsule-card { min-height: 540px; }
+      .artifact-visual { height: 270px; }
+      .artifact-symbol { width: 135px; height: 135px; }
+      .card-body { padding: 24px 20px; }
+      .footer-note { flex-direction: column; gap: 8px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="shell topbar">
+    <a class="brand" href="#top" aria-label="Capsule home">
+      <span class="brand-mark" aria-hidden="true"></span>
+      Capsule / Archive
+    </a>
+    <div class="status" aria-label="Archive status: online">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span>Archive online</span>
+    </div>
+  </header>
+
+  <main id="top" class="shell hero">
+    <section class="copy" aria-labelledby="page-title">
+      <div class="eyebrow">A time machine in your browser</div>
+      <h1 id="page-title">Open the <em>unknown.</em></h1>
+      <p class="intro">Every click pulls a different object from a random year—some are lost to history, some are waiting for the future.</p>
+      <div class="actions">
+        <button class="open-button" id="openCapsule" type="button">Open a capsule</button>
+        <div class="hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="8"/></svg>
+          <span>Random each time</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="stage" aria-label="Current capsule artifact">
+      <div class="orbit" aria-hidden="true"></div>
+      <article class="capsule-card" id="capsuleCard" aria-live="polite">
+        <div class="card-top">
+          <span>Archive entry <strong id="entryNumber">0000</strong></span>
+          <span id="eraLabel">Awaiting unlock</span>
+        </div>
+        <div class="artifact-visual" id="artifactVisual">
+          <div class="artifact-symbol" id="artifactSymbol" aria-hidden="true"></div>
+        </div>
+        <div class="card-body">
+          <div class="meta-row">
+            <span id="categoryLabel">Time fragment</span>
+            <span id="yearLabel">????</span>
+          </div>
+          <h2 class="artifact-title" id="artifactTitle">The archive is waiting</h2>
+          <p class="artifact-caption" id="artifactCaption">Choose a year and discover an artifact that survived the passage of time.</p>
+          <div class="card-footer">
+            <span id="artifactId">ID—000000</span>
+            <span id="statusLabel">Unopened</span>
+          </div>
+        </div>
+        <div class="index-mark" aria-hidden="true">C</div>
+      </article>
+    </section>
+  </main>
+
+  <footer class="shell footer-note">
+    <span>Capsule archive // 2026 edition</span>
+    <span>Built for curious minds, across every timeline</span>
+  </footer>
+
+  <p class="sr-only" id="announcer" aria-live="assertive"></p>
+
+  <script>
+    const archive = [
+      { year: 1800, category: "Object", title: "The Clockwork Compass", caption: "A brass compass whose needle points toward a forgotten city—according to its owner, it never moved.", color: "#d8ff63", symbol: "compass", era: "Historical" },
+      { year: 1824, category: "Document", title: "A Letter from the Moon", caption: "A handwritten note from an astronomer who claimed the moon had sent him a message in the night sky.", color: "#75b7ff", symbol: "letter", era: "Historical" },
+      { year: 1857, category: "Artifact", title: "The Blue Glass Key", caption: "A distorted key found inside a sealed museum cabinet, now warm to the touch as if held recently.", color: "#ff6b4a", symbol: "key", era: "Historical" },
+      { year: 1889, category: "Object", title: "The Electric Orchid", caption: "A violet bloom preserved beneath silver leaf, blooming again whenever the room is quiet.", color: "#b58cff", symbol: "flower", era: "Historical" },
+      { year: 1902, category: "Recording", title: "The Last Radio Wave", caption: "A recording that captures a voice calling from a station that disappeared in 1901.", color: "#f6c85f", symbol: "radio", era: "Historical" },
+      { year: 1927, category: "Vision", title: "The City That Folded", caption: "An impossible city chart where streets rearrange themselves when viewed from the second floor.", color: "#72e0c0", symbol: "city", era: "Historical" },
+      { year: 1956, category: "Artifact", title: "The Golden Satellite", caption: "A small metal sphere carrying a map of every known star, each marked with a name no one can read.", color: "#e9a7ff", symbol: "satellite", era: "Historical" },
+      { year: 1971, category: "Object", title: "The Seed of Tomorrow", caption: "A seed that grows only in a sealed room, and leaves behind one tiny silver leaf every night.", color: "#ffb84d", symbol: "seed", era: "Historical" },
+      { year: 1984, category: "Recording", title: "The Missing Hour", caption: "A thirty-minute recording of an ordinary afternoon, followed by an unoccupied room.", color: "#8ed4ff", era: "Historical", symbol: "wave" },
+      { year: 1999, category: "Document", title: "The Future Was Written", caption: "A newspaper from the year 1999 that contains a photograph of a building still under construction.", color: "#d8ff63", symbol: "newspaper", era: "Historical" },
+      { year: 2026, category: "Object", title: "The Living Fragment", caption: "A hand-sized piece of glass that changes shape whenever someone makes a prediction about it.", color: "#75b7ff", symbol: "glass", era: "Present" },
+      { year: 2038, category: "Vision", title: "The Last Sunset", caption: "A holographic image of the final sunset above the city, preserved in a glass frame.", color: "#ff6b4a", symbol: "sun", era: "Future" },
+      { year: 2051, category: "Artifact", title: "The Quiet Machine", caption: "A tiny silver device that converts memories into sound waves, but never plays the same one twice.", color: "#b58cff", symbol: "machine", era: "Future" },
+      { year: 2072, category: "Object", title: "The Garden of Echoes", caption: "A living garden whose flowers repeat the voices of everyone who has ever walked through it.", color: "#72e0c0", symbol: "garden", era: "Future" },
+      { year: 2099, category: "Vision", title: "The Last Blue Star", caption: "A photograph taken from the final trip to the edge of the known universe, still waiting for its light.", color: "#f6c85f", symbol: "star", era: "Future" }
+    ];
+
+    const symbolPaths = {
+      compass: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><circle cx="80" cy="80" r="52"/><path d="M80 35v90M35 80h90M51 51l58 58M109 51 51 109"/><circle cx="80" cy="80" r="10" fill="currentColor" stroke="none"/><path d="m102 58 20-20M122 38h-20v20"/></svg>`,
+      letter: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><path d="M31 42h98v76H31z"/><path d="M49 63h62M49 77h44M49 91h50"/><path d="m114 115 16-16M130 115l-16-16"/></svg>`,
+      key: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><circle cx="75" cy="80" r="34"/><path d="M109 80h43v30h-25v22h-18V80Z"/><path d="M75 80v-18M75 46V31"/></svg>`,
+      flower: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><path d="M80 136V68M80 70c-22 0-38-14-38-34 22 0 38 14 38 34ZM80 70c22 0 38-14 38-34-22 0-38 14-38 34Z"/><path d="M80 80c-20-8-31-25-27-46 19 1 31 14 27 46ZM80 80c20-8 31-25 27-46-19 1-31 14-27 46Z"/><circle cx="80" cy="80" r="9" fill="currentColor" stroke="none"/></svg>`,
+      radio: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><rect x="22" y="40" width="116" height="72" rx="8"/><path d="M48 45 80 22l32 23M80 106v32M56 138h48M46 87h68"/><circle cx="80" cy="76" r="11" fill="currentColor" stroke="none"/></svg>`,
+      city: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><path d="M34 128V58l46-24 46 24v70M52 128V82h22v46M88 128V70h30v58M34 128h92"/><path d="M61 58h18M61 70h18M61 82h18M105 84h8M105 98h8M105 112h8"/></svg>`,
+      satellite: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><path d="M68 61 101 28M99 68l33-33M63 99 30 132M95 119l-9 9M111 103l-9 9"/><circle cx="80" cy="80" r="22" fill="none"/><path d="M80 58v44M58 80h44"/><circle cx="80" cy="80" r="8" fill="currentColor" stroke="none"/></svg>`,
+      seed: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><path d="M80 139c-2-41 2-73 22-101M80 139c-5-30-18-54-44-71M80 139c19-23 33-53 37-89"/><path d="M78 77c-8-34-25-55-53-67 19 4 36 18 53 67ZM100 68c18-32 39-47 66-50-14 21-35 38-66 50Z"/><circle cx="80" cy="83" r="8" fill="currentColor" stroke="none"/></svg>`,
+      wave: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 80h26l14-40 24 80 20-52 16 12h20"/><path d="M20 105h26l14-40 24 80 20-52 16 12h20" opacity=".45"/><circle cx="80" cy="80" r="67"/></svg>`,
+      newspaper: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><path d="M26 33h108v94H26z"/><path d="M39 50h82M39 65h82M39 80h82M39 95h82M39 110h50"/><path d="M103 104h18v18h-18z"/></svg>`,
+      glass: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><path d="M50 32h60l-7 93c-1 7-6 12-13 12H70c-7 0-12-5-13-12L50 32Z"/><path d="M61 46h38M67 68h26M66 88h28"/><path d="M42 32h76"/></svg>`,
+      sun: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><circle cx="80" cy="80" r="30"/><path d="M80 16v18M80 126v18M16 80h18M126 80h18M34 34l13 13M113 113l13 13M126 34l-13 13M47 113l-13 13"/><circle cx="80" cy="80" r="8" fill="currentColor" stroke="none"/></svg>`,
+      machine: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><rect x="28" y="44" width="104" height="72" rx="8"/><path d="M49 44V28h62v16M55 116v17M105 116v17M55 94h50M80 116v17"/><circle cx="80" cy="80" r="14" fill="currentColor" stroke="none"/></svg>`,
+      garden: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><path d="M80 142V63M80 136c-24-4-42-20-45-43 26 3 45 18 45 43ZM80 136c24-4 42-20 45-43-26 3-45 18-45 43Z"/><path d="M80 88c-19-10-28-28-24-48 17 3 28 17 24 48ZM80 88c19-10 28-28 24-48-17 3-28 17-24 48Z"/><circle cx="80" cy="80" r="8" fill="currentColor" stroke="none"/></svg>`,
+      star: `<svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="2"><path d="m80 18 13 34 36 4-27 22 9 35-31-19-31 19 9-35-27-22 36-4L80 18Z"/><circle cx="80" cy="80" r="9" fill="currentColor" stroke="none"/><path d="M80 12v18M80 130v18M12 80h18M130 80h18"/></svg>`
+    };
+
+    const elements = {
+      card: document.getElementById("capsuleCard"),
+      button: document.getElementById("openCapsule"),
+      visual: document.getElementById("artifactVisual"),
+      symbol: document.getElementById("artifactSymbol"),
+      entryNumber: document.getElementById("entryNumber"),
+      era: document.getElementById("eraLabel"),
+      category: document.getElementById("categoryLabel"),
+      year: document.getElementById("yearLabel"),
+      title: document.getElementById("artifactTitle"),
+      caption: document.getElementById("artifactCaption"),
+      id: document.getElementById("artifactId"),
+      status: document.getElementById("statusLabel"),
+      announcer: document.getElementById("announcer")
+    };
+
+    let currentArtifact = null;
+    let entryCount = 0;
+
+    function randomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function selectArtifact() {
+      const source = archive[randomInt(0, archive.length - 1)];
+      const sourceIsCurrent = source.year === 2026;
+      const year = sourceIsCurrent ? 2026 : source.year;
+
+      return {
+        ...source,
+        year,
+        id: `${String(year).padStart(4, "0")}-${String(randomInt(100, 999)).padStart(3, "0")}`,
+        entry: ++entryCount
+      };
+    }
+
+    function renderArtifact(artifact) {
+      const color = artifact.color;
+      elements.card.style.setProperty("--artifact-color", color);
+      elements.card.style.setProperty("--artifact-glow", `${color}22`);
+      elements.visual.style.setProperty("--artifact-color", color);
+      elements.symbol.innerHTML = symbolPaths[artifact.symbol] || symbolPaths.star;
+
+      elements.entryNumber.textContent = String(artifact.entry).padStart(4, "0");
+      elements.era.textContent = artifact.era;
+      elements.category.textContent = artifact.category;
+      elements.year.textContent = artifact.year;
+      elements.title.textContent = artifact.title;
+      elements.caption.textContent = artifact.caption;
+      elements.id.textContent = `ID—${artifact.id}`;
+      elements.status.textContent = "Opened";
+
+      elements.card.classList.remove("revealed");
+      void elements.card.offsetWidth;
+      elements.card.classList.add("revealed");
+      elements.announcer.textContent = `Capsule opened. Artifact: ${artifact.title}, from ${artifact.year}.`;
+    }
+
+    function openCapsule() {
+      const artifact = selectArtifact();
+      currentArtifact = artifact;
+      renderArtifact(artifact);
+      elements.button.textContent = "Open another capsule";
+    }
+
+    elements.button.addEventListener("click", openCapsule);
+
+    window.addEventListener("keydown", (event) => {
+      if (event.code === "Space" && event.target === document.body) {
+        event.preventDefault();
+        openCapsule();
+      }
+    });
+  </script>
+</body>
+</html>
